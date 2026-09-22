@@ -25,3 +25,6 @@ dotnet run --project src/Cli
 ### Запуск у форматі json:
 ```bash
 dotnet run --project src/Cli -- --json
+
+• macOS (osx-arm64): dotnet publish src/Cli-c Release-r osx-arm64--self-contained true
+• Linux (linux-x64): dotnet publish src/Cli-c Release-r linux-x64--self-contained true
