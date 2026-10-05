@@ -6,6 +6,12 @@
 # dotenv files
 .env
 
+bin/
+obj/
+.vs/
+.idea/
+.DS_Store
+
 # User-specific files
 *.rsuser
 *.suo
