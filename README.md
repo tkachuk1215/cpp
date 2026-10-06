@@ -38,3 +38,13 @@ dotnet run --project src/Cli
 
 - Windows (win-x64) Self-contained:
   dotnet publish src/Cli -c Release -r win-x64 --self-contained true
+
+### Порівняння режимів публікації (Publishing)
+
+| RID | Режим | Потрібен runtime | Розмір publish | Примітка |
+| :--- | :--- | :---: | :---: | :--- |
+| **osx-arm64** | Framework-dependent (`fd`) | Так (.NET 10) | ~0.2 МБ | Лише бінарники додатка та залежності |
+| **osx-arm64** | Self-contained (`sc`) | Ні | ~80 МБ | Містить повну копію .NET Runtime |
+| **osx-arm64** | Single-file (`single`) | Ні | ~80 МБ | Усі компоненти та Runtime упаковано в один файл |
+| **osx-arm64** | Trimmed (`trimmed`) | Ні | ~15 МБ | Видалено невикористаний код .NET Runtime (IL Trimming)
+
