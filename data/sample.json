@@ -1,0 +1,30 @@
+[
+  {
+    "id": "J-001",
+    "sku": "SKU-J1",
+    "name": "Цемент JSON 25кг",
+    "unit": "шт",
+    "quantity": 50
+  },
+  {
+    "id": "J-002",
+    "sku": "SKU-J2",
+    "name": "Пісок JSON",
+    "unit": "т",
+    "quantity": 15
+  },
+  {
+    "id": "",
+    "sku": "SKU-J3",
+    "name": "Порожній ID",
+    "unit": "шт",
+    "quantity": 10
+  },
+  {
+    "id": "J-004",
+    "sku": "SKU-J4",
+    "name": "Від'ємна кількість",
+    "unit": "шт",
+    "quantity": -5
+  }
+]
