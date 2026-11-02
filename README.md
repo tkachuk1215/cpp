@@ -33,8 +33,19 @@ CrossApp/
     └── Core/
         ├── Core.csproj
         ├── EnvironmentInfo.cs
-        ├── Dto/            # ProductDto (+ WarehouseDto), ImportResult<T>, ImportStats
-        └── Import/         # ProductCsvImporter, ProductJsonImporter
+        ├── Domain/
+        │   ├── Product.cs
+        │   ├── ProductStatus.cs
+        │   ├── Warehouse.cs
+        │   └── WarehousePlacementPolicy.cs
+        ├── Dto/
+        │   ├── ImportResult.cs
+        │   ├── ImportStats.cs
+        │   └── ProductDto.cs     
+        └── Import/
+            ├── ProductCsvImporter.cs
+            ├── ProductImportMapper.cs
+            └── ProductJsonImporter.cs    
 ```
 
 ## Імпорт даних (ЛР 3)
@@ -78,6 +89,34 @@ CrossApp/
 - `W;id;name;address` — склад.
 
 Цей режим вмикається, якщо файл називається `heterogeneous.csv`.
+
+## Доменна модель (ЛР 4)
+
+Сутності лежать у `src/Core/Domain`: `Product`, `Warehouse`, `ProductStatus`, а правило на дві сутності
+в `WarehousePlacementPolicy`. Records з `Core/Dto` залишилися DTO (формат даних),
+зв'язок з сутностями через `ToDto` / `FromDto`.
+
+### Інваріанти
+
+- Id, SKU, назва та одиниця виміру товару не порожні (`ArgumentException`, `Product.Create`)
+- Початковий залишок ≥ 0 (`ArgumentOutOfRangeException`, `Product.Create`)
+- Статус товару — відомий елемент `ProductStatus` (`Product.Create`, `FromDto`)
+- Архівний товар не може мати залишок (`ArgumentException`, `Product.Create`)
+- Кількість приходу > 0 (`ArgumentOutOfRangeException`, `RegisterArrival`)
+- Кількість видачі > 0 (`ArgumentOutOfRangeException`, `Issue`)
+- Не можна видати більше, ніж є на залишку (`InvalidOperationException`, `Issue`)
+- Прихід лише для активного товару, видача не для архівного (`InvalidOperationException`)
+- Допустимі переходи статусу: Active ↔ Discontinued, Discontinued → Archived
+  (`InvalidOperationException`, `Discontinue` / `Reactivate` / `Archive`)
+- Архівувати можна лише товар із нульовим залишком (`InvalidOperationException`, `Archive`)
+- Id, назва й адреса складу не порожні (`ArgumentException`, `Warehouse.Create`)
+- На складі не більше 5 різних товарів, без дублів SKU і без архівних
+  (`InvalidOperationException`, `WarehousePlacementPolicy.EnsureCanPlace`)
+- `FromDto` не обходить перевірки: відновлює сутність через `Create`
+
+### Демонстрація
+
+`dotnet run --project src/Cli` виводить після імпорту два сценарії: успішний і той, що порушує інваріанти.
 
 ### Запуск імпорту
 
