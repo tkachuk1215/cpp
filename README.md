@@ -29,23 +29,23 @@ CrossApp/
 └── src/
     ├── Cli/
     │   ├── Cli.csproj
-    │   └── Program.cs      # аргументи, виклик імпорту, вивід
+    │   └── Program.cs      # аргументи, імпорт, вивід, демонстрація доменної моделі
     └── Core/
         ├── Core.csproj
         ├── EnvironmentInfo.cs
-        ├── Domain/
+        ├── Domain/                         # сутності з поведінкою та інваріантами (ЛР 4)
         │   ├── Product.cs
         │   ├── ProductStatus.cs
         │   ├── Warehouse.cs
         │   └── WarehousePlacementPolicy.cs
-        ├── Dto/
+        ├── Dto/                            # формат даних (ЛР 3)
         │   ├── ImportResult.cs
         │   ├── ImportStats.cs
-        │   └── ProductDto.cs     
+        │   └── ProductDto.cs
         └── Import/
             ├── ProductCsvImporter.cs
-            ├── ProductImportMapper.cs
-            └── ProductJsonImporter.cs    
+            ├── ProductImportMapper.cs      # DTO -> сутності (ЛР 4)
+            └── ProductJsonImporter.cs
 ```
 
 ## Імпорт даних (ЛР 3)
@@ -79,6 +79,7 @@ CrossApp/
 ### Формат JSON (`data/sample.json`)
 
 Масив об'єктів з полями `id`, `sku`, `name`, `unit`, `quantity` (регістр імен властивостей не важливий).
+Необов'язкові поля: `note` (примітка) та `status` (`Active`, `Discontinued` або `Archived`; якщо не задано, товар активний).
 Помилки повідомляються з номером об'єкта (`об'єкт JSON #3`).
 
 ### Гетерогенний CSV (`data/heterogeneous.csv`)
@@ -89,34 +90,6 @@ CrossApp/
 - `W;id;name;address` — склад.
 
 Цей режим вмикається, якщо файл називається `heterogeneous.csv`.
-
-## Доменна модель (ЛР 4)
-
-Сутності лежать у `src/Core/Domain`: `Product`, `Warehouse`, `ProductStatus`, а правило на дві сутності
-в `WarehousePlacementPolicy`. Records з `Core/Dto` залишилися DTO (формат даних),
-зв'язок з сутностями через `ToDto` / `FromDto`.
-
-### Інваріанти
-
-- Id, SKU, назва та одиниця виміру товару не порожні (`ArgumentException`, `Product.Create`)
-- Початковий залишок ≥ 0 (`ArgumentOutOfRangeException`, `Product.Create`)
-- Статус товару — відомий елемент `ProductStatus` (`Product.Create`, `FromDto`)
-- Архівний товар не може мати залишок (`ArgumentException`, `Product.Create`)
-- Кількість приходу > 0 (`ArgumentOutOfRangeException`, `RegisterArrival`)
-- Кількість видачі > 0 (`ArgumentOutOfRangeException`, `Issue`)
-- Не можна видати більше, ніж є на залишку (`InvalidOperationException`, `Issue`)
-- Прихід лише для активного товару, видача не для архівного (`InvalidOperationException`)
-- Допустимі переходи статусу: Active ↔ Discontinued, Discontinued → Archived
-  (`InvalidOperationException`, `Discontinue` / `Reactivate` / `Archive`)
-- Архівувати можна лише товар із нульовим залишком (`InvalidOperationException`, `Archive`)
-- Id, назва й адреса складу не порожні (`ArgumentException`, `Warehouse.Create`)
-- На складі не більше 5 різних товарів, без дублів SKU і без архівних
-  (`InvalidOperationException`, `WarehousePlacementPolicy.EnsureCanPlace`)
-- `FromDto` не обходить перевірки: відновлює сутність через `Create`
-
-### Демонстрація
-
-`dotnet run --project src/Cli` виводить після імпорту два сценарії: успішний і той, що порушує інваріанти.
 
 ### Запуск імпорту
 
@@ -136,6 +109,48 @@ Cli виводить кількість завантажених записів,
 | :---: | :--- |
 | 0 | імпорт виконано (навіть якщо частину рядків пропущено) |
 | 1 | файл не знайдено або непідтримуваний формат |
+
+## Доменна модель (ЛР 4)
+
+Сутності лежать у `src/Core/Domain`: `Product`, `Warehouse`, `ProductStatus`, а правило на дві сутності
+— у `WarehousePlacementPolicy`. Records з `Core/Dto` залишилися DTO (формат даних),
+зв'язок з сутностями — через `ToDto` / `FromDto`.
+
+Стан сутностей інкапсульований: конструктори приватні, об'єкти створюються лише фабричними методами `Create`,
+змінити стан можна лише методами з бізнес-назвами (`RegisterArrival`, `Issue`, `Discontinue`, `Reactivate`, `Archive`).
+
+### Інваріанти
+
+- Id, SKU, назва та одиниця виміру товару не порожні (`ArgumentException`, `Product.Create`)
+- Початковий залишок ≥ 0 (`ArgumentOutOfRangeException`, `Product.Create`)
+- Статус товару — відомий елемент `ProductStatus` (`ArgumentOutOfRangeException` / `ArgumentException`, `Product.Create`, `Product.FromDto`)
+- Архівний товар не може мати залишок (`ArgumentException`, `Product.Create`)
+- Кількість приходу > 0 (`ArgumentOutOfRangeException`, `Product.RegisterArrival`)
+- Кількість видачі > 0 (`ArgumentOutOfRangeException`, `Product.Issue`)
+- Не можна видати більше, ніж є на залишку (`InvalidOperationException`, `Product.Issue`)
+- Прихід лише для активного товару, видача не для архівного (`InvalidOperationException`, `Product.RegisterArrival`, `Product.Issue`)
+- Допустимі переходи статусу: Active ↔ Discontinued, Discontinued → Archived
+  (`InvalidOperationException`, `Product.Discontinue` / `Reactivate` / `Archive`)
+- Архівувати можна лише товар із нульовим залишком (`InvalidOperationException`, `Product.Archive`)
+- Id, назва й адреса складу не порожні (`ArgumentException`, `Warehouse.Create`, `Warehouse.ChangeAddress`)
+- На складі не більше 5 різних товарів, без дублів SKU і без архівних
+  (`InvalidOperationException`, `WarehousePlacementPolicy.EnsureCanPlace`)
+- `FromDto` не обходить перевірки: відновлює сутність через `Create` (`Product.FromDto`, `Warehouse.FromDto`)
+
+### Додаткові завдання
+
+- **Імпорт у сутності:** `ProductImportMapper.ToEntities` перетворює `ImportResult<ProductDto>` на сутності
+  та перелік записів, які не пройшли інваріанти.
+- **Правило на дві сутності:** `WarehousePlacementPolicy` (ліміт різних товарів на складі).
+  Воно винесене з сутностей, бо потребує списку розміщених товарів зі сховища (сервіс з'явиться на тижні 5).
+- **Явний статус:** `ProductStatus` (`Active`, `Discontinued`, `Archived`), допустимі переходи
+  перевіряються через `switch` expression у `Product.IsTransitionAllowed`.
+
+### Демонстрація
+
+`dotnet run --project src/Cli` виводить після імпорту блок «Імпорт -> сутності» та два сценарії:
+успішний і той, що порушує інваріанти (виводиться лише `Message` винятків, без stack trace).
+Для `heterogeneous.csv` демонстрація доменної моделі не виконується.
 
 ## Запуск та Збірка
 
