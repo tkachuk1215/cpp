@@ -136,8 +136,3 @@ dotnet run --project src/Cli -- --file
 | osx-arm64 | Self-contained (`sc`) | Ні | ~80 МБ | Містить повну копію .NET Runtime |
 | osx-arm64 | Single-file (`single`) | Ні | ~80 МБ | Усі компоненти та Runtime упаковано в один файл |
 | osx-arm64 | Trimmed (`trimmed`) | Ні | ~15 МБ | Видалено невикористаний код .NET Runtime (IL Trimming) |
-
-## Коміти
-
-- `lab05` — сервісний шар: інтерфейс `ICatalogStore`, дві реалізації, `CatalogService`, ручний DI
-</document_content>
