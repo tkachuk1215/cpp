@@ -1,129 +1,22 @@
-# CrossApp
+# CrossApp — складський облік (Крос-платформне програмування)
 
-Наскрізний проєкт з крос-платформного програмування.
+Рішення складається з двох проєктів:
 
-## Середовище розробки
-- .NET SDK: 10.0
-- ОС: macOS (Apple Silicon / osx-arm64)
-- IDE: Visual Studio Code
+- `src/Core` — доменна модель, DTO, абстракції, сховища, сервіси
+- `src/Cli` — консольний застосунок (composition root), посилання Cli → Core
 
-## Предметна область: Склад
-- Product (товар) — номенклатура продукції;
-- StockBatch (партія) — конкретна партія надходження з терміном придатності та ціною;
-- Warehouse (склад) — фізичне місце зберігання;
-- Movement (переміщення) — операція внутрішнього або зовнішнього переміщення товарів.
+> Розділи про імпорт CSV/JSON (тиждень 3) залиште тут без змін, якщо вони були на початку вашого README.
 
-Призначення: Облік залишків товарів по партіях та контроль переміщень на складах.
+## Доменна модель (тиждень 4)
 
-## Структура проєкту
-
-```
-CrossApp/
-├── CrossApp.slnx
-├── .gitignore
-├── data/
-│   ├── sample.csv          # 10 коректних і 3 пошкоджені рядки
-│   ├── sample.json         # 2 коректні і 2 пошкоджені об'єкти
-│   └── heterogeneous.csv   # змішані записи: товари (P) і склади (W)
-├── publish/
-└── src/
-    ├── Cli/
-    │   ├── Cli.csproj
-    │   └── Program.cs      # аргументи, імпорт, вивід, демонстрація доменної моделі
-    └── Core/
-        ├── Core.csproj
-        ├── EnvironmentInfo.cs
-        ├── Domain/                         # сутності з поведінкою та інваріантами (ЛР 4)
-        │   ├── Product.cs
-        │   ├── ProductStatus.cs
-        │   ├── Warehouse.cs
-        │   └── WarehousePlacementPolicy.cs
-        ├── Dto/                            # формат даних (ЛР 3)
-        │   ├── ImportResult.cs
-        │   ├── ImportStats.cs
-        │   └── ProductDto.cs
-        └── Import/
-            ├── ProductCsvImporter.cs
-            ├── ProductImportMapper.cs      # DTO -> сутності (ЛР 4)
-            └── ProductJsonImporter.cs
-```
-
-## Імпорт даних (ЛР 3)
-
-### Формат CSV (`data/sample.csv`)
-
-| Параметр | Значення |
-| :--- | :--- |
-| Роздільник | `;` (крапка з комою) |
-| Заголовок | `id;sku;name;unit;quantity` — необов'язковий, якщо є, то пропускається |
-| Кодування | UTF-8 |
-| Коментарі | рядки, що починаються з `#`, пропускаються |
-| Порожні рядки | пропускаються |
-| Числа | розбираються з `CultureInfo.InvariantCulture` |
-
-Приклад рядка: `P-001;SKU-001;Цемент М400 25кг;шт;120`
-
-Правила валідації: рівно 5 колонок; `id`, `sku`, `name`, `unit` не порожні; `quantity` — невід'ємне ціле число.
-Некоректний рядок не перериває імпорт: він потрапляє в список помилок із номером рядка.
-
-### Навмисно пошкоджені рядки в `sample.csv`
-
-Це тестові дані для перевірки обробки помилок:
-
-| Рядок | Дефект | Повідомлення |
-| :---: | :--- | :--- |
-| 12 | мало колонок | `очікую 5 колонок, отримав 4` |
-| 13 | нечислова кількість | `кількість 'багато' має бути невід'ємним цілим числом` |
-| 14 | порожній SKU | `SKU не може бути порожнім` |
-
-### Формат JSON (`data/sample.json`)
-
-Масив об'єктів з полями `id`, `sku`, `name`, `unit`, `quantity` (регістр імен властивостей не важливий).
-Необов'язкові поля: `note` (примітка) та `status` (`Active`, `Discontinued` або `Archived`; якщо не задано, товар активний).
-Помилки повідомляються з номером об'єкта (`об'єкт JSON #3`).
-
-### Гетерогенний CSV (`data/heterogeneous.csv`)
-
-Додаткове завдання: перша колонка — тип запису.
-
-- `P;id;sku;name;unit;quantity` — товар;
-- `W;id;name;address` — склад.
-
-Цей режим вмикається, якщо файл називається `heterogeneous.csv`.
-
-### Запуск імпорту
-
-```bash
-dotnet run --project src/Cli                          # data/sample.csv за замовчуванням
-dotnet run --project src/Cli data/sample.json         # JSON
-dotnet run --project src/Cli data/heterogeneous.csv   # змішані записи
-dotnet run --project src/Cli data/nofile.csv          # неіснуючий файл
-echo $?
-```
-
-Cli виводить кількість завантажених записів, перші 5, перелік пропущених рядків з номерами та рядок статистики.
-
-### Коди завершення
-
-| Код | Значення |
-| :---: | :--- |
-| 0 | імпорт виконано (навіть якщо частину рядків пропущено) |
-| 1 | файл не знайдено або непідтримуваний формат |
-
-## Доменна модель (ЛР 4)
-
-Сутності лежать у `src/Core/Domain`: `Product`, `Warehouse`, `ProductStatus`, а правило на дві сутності
-— у `WarehousePlacementPolicy`. Records з `Core/Dto` залишилися DTO (формат даних),
-зв'язок з сутностями — через `ToDto` / `FromDto`.
-
-Стан сутностей інкапсульований: конструктори приватні, об'єкти створюються лише фабричними методами `Create`,
+Стан сутностей інкапсульований: конструктори приватні, об'єкти створюються лише фабричними методами Create,
 змінити стан можна лише методами з бізнес-назвами (`RegisterArrival`, `Issue`, `Discontinue`, `Reactivate`, `Archive`).
 
 ### Інваріанти
 
 - Id, SKU, назва та одиниця виміру товару не порожні (`ArgumentException`, `Product.Create`)
 - Початковий залишок ≥ 0 (`ArgumentOutOfRangeException`, `Product.Create`)
-- Статус товару — відомий елемент `ProductStatus` (`ArgumentOutOfRangeException` / `ArgumentException`, `Product.Create`, `Product.FromDto`)
+- Статус товару — відомий елемент ProductStatus (`ArgumentOutOfRangeException` / `ArgumentException`, `Product.Create`, `Product.FromDto`)
 - Архівний товар не може мати залишок (`ArgumentException`, `Product.Create`)
 - Кількість приходу > 0 (`ArgumentOutOfRangeException`, `Product.RegisterArrival`)
 - Кількість видачі > 0 (`ArgumentOutOfRangeException`, `Product.Issue`)
@@ -137,50 +30,114 @@ Cli виводить кількість завантажених записів,
   (`InvalidOperationException`, `WarehousePlacementPolicy.EnsureCanPlace`)
 - `FromDto` не обходить перевірки: відновлює сутність через `Create` (`Product.FromDto`, `Warehouse.FromDto`)
 
-### Додаткові завдання
+### Додаткові завдання (тиждень 4)
 
-- **Імпорт у сутності:** `ProductImportMapper.ToEntities` перетворює `ImportResult<ProductDto>` на сутності
+- Імпорт у сутності: `ProductImportMapper.ToEntities` перетворює `ImportResult<ProductDto>` на сутності
   та перелік записів, які не пройшли інваріанти.
-- **Правило на дві сутності:** `WarehousePlacementPolicy` (ліміт різних товарів на складі).
-  Воно винесене з сутностей, бо потребує списку розміщених товарів зі сховища (сервіс з'явиться на тижні 5).
-- **Явний статус:** `ProductStatus` (`Active`, `Discontinued`, `Archived`), допустимі переходи
-  перевіряються через `switch` expression у `Product.IsTransitionAllowed`.
+- Правило на дві сутності: `WarehousePlacementPolicy` (ліміт різних товарів на складі).
+- Явний статус: `ProductStatus` (`Active`, `Discontinued`, `Archived`), допустимі переходи
+  перевіряються через switch expression у `Product.IsTransitionAllowed`.
+
+## Сервісний шар (тиждень 5)
+
+Доменна логіка не залежить від способу зберігання даних: сервіс працює з абстракцією сховища,
+а конкретна реалізація обирається вручну в точці входу (ручний DI, без контейнера).
+
+### Компоненти
+
+| Компонент | Файл | Призначення |
+| :--- | :--- | :--- |
+| `ICatalogStore` | `src/Core/Abstractions/ICatalogStore.cs` | Контракт сховища: `List`, `GetById`, `Add`, `Update`, `Remove` |
+| `InMemoryCatalogStore` | `src/Core/Storage/InMemoryCatalogStore.cs` | Сховище в пам'яті (`Dictionary`), початкові дані через конструктор |
+| `FileCatalogStore` | `src/Core/Storage/FileCatalogStore.cs` | Файлове сховище: кеш у пам'яті, ледаче завантаження, запис JSON після кожної зміни |
+| `CachingCatalogStore` | `src/Core/Storage/CachingCatalogStore.cs` | Декоратор над будь-яким `ICatalogStore` (додаткове завдання) |
+| `CatalogService` | `src/Core/Services/CatalogService.cs` | Бізнес-операції: `Add`, `Receive` (прихід), `Issue` (видача), `All`, `Find`, пошук за предикатом |
+| `SampleData` | `src/Core/SampleData.cs` | Демонстраційні дані (15–20 записів) |
+| `StoreFactory` | `src/Cli/StoreFactory.cs` | Вибір реалізації за аргументами командного рядка |
+| `Program.cs` | `src/Cli/Program.cs` | Composition root і демонстраційний сценарій |
+
+### Схема залежностей
+
+```
+Cli (Program.cs, StoreFactory) → CatalogService → ICatalogStore ← InMemoryCatalogStore | FileCatalogStore
+                                                                  ↑
+                                                       CachingCatalogStore (обгортає інше сховище)
+```
+
+- `CatalogService` приймає `ICatalogStore` через конструктор і не знає про конкретні реалізації.
+- Конкретні класи створюються лише в проєкті Cli (`StoreFactory` + `Program.cs` — composition root).
+- `Core` не містить `new FileCatalogStore(...)` та викликів `Console.`.
+- `Microsoft.Extensions.DependencyInjection` **не підключено** (контейнер з'явиться разом з Api).
+
+### Формат зберігання
+
+- Файловий режим: `data/catalog.json` відносно папки виконання (`AppContext.BaseDirectory`),
+  наприклад `src/Cli/bin/Debug/net10.0/data/catalog.json`.
+- Формат: JSON з відступами. На диск записуються `ProductDto`, а не сутності
+  (мапінг `Product.FromDto` / `product.ToDto`).
+
+### Режими запуску
+
+| Команда | Сховище | Поведінка |
+| :--- | :--- | :--- |
+| `dotnet run --project src/Cli` | `InMemoryCatalogStore` | Дані з `SampleData`, після виходу зникають |
+| `dotnet run --project src/Cli -- --file` | `FileCatalogStore` | Створюється `catalog.json`, повторний запуск бачить попередні записи |
+| `dotnet run --project src/Cli -- --cache` | `CachingCatalogStore` | Декоратор над in-memory сховищем |
+| `dotnet run --project src/Cli -- --file --cache` | `CachingCatalogStore` → `FileCatalogStore` | Декоратор над файловим сховищем |
+
+Щоб очистити файлові дані, видаліть `catalog.json`:
+
+```bash
+rm -f src/Cli/bin/Debug/net10.0/data/catalog.json
+```
 
 ### Демонстрація
 
-`dotnet run --project src/Cli` виводить після імпорту блок «Імпорт -> сутності» та два сценарії:
-успішний і той, що порушує інваріанти (виводиться лише `Message` винятків, без stack trace).
-Для `heterogeneous.csv` демонстрація доменної моделі не виконується.
+Сценарій у `Program.cs`: додати товар, змінити (прихід), показати список, знайти за id.
+Також демонструються помилки, які перехоплюються в `try/catch` і виводяться людським текстом:
+дубль id, відсутній id, видача більша за залишок, некоректна кількість приходу.
 
-## Запуск та Збірка
+## Запуск та збірка
 
 ### Збірка рішення:
+
+```bash
 dotnet build
+```
 
 ### Запуск CLI-застосунку:
+
+```bash
 dotnet run --project src/Cli
+dotnet run --project src/Cli -- --file
+```
 
 ## Публікація (Publishing)
 
 ### Команди публікації:
 
 - macOS (osx-arm64) Self-contained:
-  dotnet publish src/Cli -c Release -r osx-arm64 --self-contained true -o publish/sc
+  `dotnet publish src/Cli -c Release -r osx-arm64 --self-contained true -o publish/sc`
 
 - macOS (osx-arm64) Framework-dependent:
-  dotnet publish src/Cli -c Release -r osx-arm64 --self-contained false -o publish/fd
+  `dotnet publish src/Cli -c Release -r osx-arm64 --self-contained false -o publish/fd`
 
 - Linux (linux-x64) Self-contained:
-  dotnet publish src/Cli -c Release -r linux-x64 --self-contained true
+  `dotnet publish src/Cli -c Release -r linux-x64 --self-contained true`
 
 - Windows (win-x64) Self-contained:
-  dotnet publish src/Cli -c Release -r win-x64 --self-contained true
+  `dotnet publish src/Cli -c Release -r win-x64 --self-contained true`
 
 ### Порівняння режимів публікації (Publishing)
 
 | RID | Режим | Потрібен runtime | Розмір publish | Примітка |
 | :--- | :--- | :---: | :---: | :--- |
-| **osx-arm64** | Framework-dependent (`fd`) | Так (.NET 10) | ~0.2 МБ | Лише бінарники додатка та залежності |
-| **osx-arm64** | Self-contained (`sc`) | Ні | ~80 МБ | Містить повну копію .NET Runtime |
-| **osx-arm64** | Single-file (`single`) | Ні | ~80 МБ | Усі компоненти та Runtime упаковано в один файл |
-| **osx-arm64** | Trimmed (`trimmed`) | Ні | ~15 МБ | Видалено невикористаний код .NET Runtime (IL Trimming) |
+| osx-arm64 | Framework-dependent (`fd`) | Так (.NET 10) | ~0.2 МБ | Лише бінарники додатка та залежності |
+| osx-arm64 | Self-contained (`sc`) | Ні | ~80 МБ | Містить повну копію .NET Runtime |
+| osx-arm64 | Single-file (`single`) | Ні | ~80 МБ | Усі компоненти та Runtime упаковано в один файл |
+| osx-arm64 | Trimmed (`trimmed`) | Ні | ~15 МБ | Видалено невикористаний код .NET Runtime (IL Trimming) |
+
+## Коміти
+
+- `lab05` — сервісний шар: інтерфейс `ICatalogStore`, дві реалізації, `CatalogService`, ручний DI
+</document_content>
