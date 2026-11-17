@@ -51,7 +51,7 @@
 | `InMemoryCatalogStore` | `src/Core/Storage/InMemoryCatalogStore.cs` | Сховище в пам'яті (`Dictionary`), початкові дані через конструктор |
 | `FileCatalogStore` | `src/Core/Storage/FileCatalogStore.cs` | Файлове сховище: кеш у пам'яті, ледаче завантаження, запис JSON після кожної зміни |
 | `CachingCatalogStore` | `src/Core/Storage/CachingCatalogStore.cs` | Декоратор над будь-яким `ICatalogStore` (додаткове завдання) |
-| `CatalogService` | `src/Core/Services/CatalogService.cs` | Бізнес-операції: `Add`, `Receive` (прихід), `Issue` (видача), `All`, `Find`, пошук за предикатом |
+| `CatalogService` | `src/Core/Services/CatalogService.cs` | Бізнес-операції: `Add`, `Receive` (прихід), `Issue` (видача), `All`, `Find`, `FindAll`, подія `Changed` |
 | `SampleData` | `src/Core/SampleData.cs` | Демонстраційні дані (15–20 записів) |
 | `StoreFactory` | `src/Cli/StoreFactory.cs` | Вибір реалізації за аргументами командного рядка |
 | `Program.cs` | `src/Cli/Program.cs` | Composition root і демонстраційний сценарій |
@@ -96,6 +96,42 @@ rm -f src/Cli/bin/Debug/net10.0/data/catalog.json
 Сценарій у `Program.cs`: додати товар, змінити (прихід), показати список, знайти за id.
 Також демонструються помилки, які перехоплюються в `try/catch` і виводяться людським текстом:
 дубль id, відсутній id, видача більша за залишок, некоректна кількість приходу.
+
+## Доменні події (тиждень 6)
+
+`CatalogService` сповіщає зовнішній код про зміни стану через подію. `Core` лише піднімає подію
+і нічого не знає про консоль чи файли: обробку визначає `Cli`.
+
+### Компоненти
+
+| Компонент | Файл | Призначення |
+| :--- | :--- | :--- |
+| `CatalogChangeKind` | `src/Core/Events/CatalogChangeKind.cs` | Вид зміни: `Added`, `Received`, `Issued`, `Removed` |
+| `CatalogChangedEventArgs` | `src/Core/Events/CatalogChangedEventArgs.cs` | Дані події: `Id`, `Kind`, `Delta`, `QuantityAfter`, `At` |
+| `CatalogService.Changed` | `src/Core/Services/CatalogService.cs` | `event EventHandler<CatalogChangedEventArgs>?`, піднімається в `OnChanged` після успішної зміни |
+| `INotificationSink` | `src/Core/Notifications/INotificationSink.cs` | Контракт приймача сповіщень (додаткове завдання 1) |
+| `ConsoleSink`, `FileSink` | `src/Cli/` | Реалізації приймачів, передаються сервісу через конструктор |
+| `Program.cs` | `src/Cli/Program.cs` | Підписки `+=` / `-=`, лог у `logs/app.log` |
+
+### Правила
+
+- Подія піднімається лише після успішної зміни: якщо інваріант кинув виняток, повідомлення немає.
+- Підписники в Cli: локальний метод `OnCatalogChanged` (консоль + `logs/app.log`) і лямбда-лічильник із замиканням.
+- Після `-=` обробник мовчить, але дані змінюються.
+- `FindAll(Func<Product, bool>)` повертає значення, тому тут делегат `Func`, а не подія.
+- `ImportLines(lines, Action<string> onSkipped)`: Core повідомляє про пропущені рядки через колбек (додаткове завдання 2).
+- `Core` не містить `Console` і `logs` (перевірено через `grep`).
+
+### Файли логів
+
+- `logs/app.log` відносно `AppContext.BaseDirectory`, каталог створюється кодом; містить події до відписки.
+- `logs/sink.log`: пише `FileSink`, містить усі події, бо sink не відписується.
+
+### Запуск
+
+```bash
+dotnet run --project src/Cli
+```
 
 ## Запуск та збірка
 
