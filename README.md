@@ -2,10 +2,8 @@
 
 Рішення складається з двох проєктів:
 
-- `src/Core` — доменна модель, DTO, абстракції, сховища, сервіси
+- `src/Core` — доменна модель, DTO, абстракції, сховища, сервіси, події, звіти
 - `src/Cli` — консольний застосунок (composition root), посилання Cli → Core
-
-> Розділи про імпорт CSV/JSON (тиждень 3) залиште тут без змін, якщо вони були на початку вашого README.
 
 ## Доменна модель (тиждень 4)
 
@@ -51,10 +49,9 @@
 | `InMemoryCatalogStore` | `src/Core/Storage/InMemoryCatalogStore.cs` | Сховище в пам'яті (`Dictionary`), початкові дані через конструктор |
 | `FileCatalogStore` | `src/Core/Storage/FileCatalogStore.cs` | Файлове сховище: кеш у пам'яті, ледаче завантаження, запис JSON після кожної зміни |
 | `CachingCatalogStore` | `src/Core/Storage/CachingCatalogStore.cs` | Декоратор над будь-яким `ICatalogStore` (додаткове завдання) |
-| `CatalogService` | `src/Core/Services/CatalogService.cs` | Бізнес-операції: `Add`, `Receive` (прихід), `Issue` (видача), `All`, `Find`, `FindAll`, подія `Changed` |
-| `SampleData` | `src/Core/SampleData.cs` | Демонстраційні дані (15–20 записів) |
+| `CatalogService` | `src/Core/Services/CatalogService.cs` | Бізнес-операції: `Add`, `Receive` (прихід), `Issue` (видача), `Remove`, `All`, `Find`, `FindAll`, подія `Changed` |
+| `SampleData` | `src/Core/SampleData.cs` | Демонстраційні дані (20 записів, 5 одиниць виміру), переміщення для Join, генератор для бенчмарка |
 | `StoreFactory` | `src/Cli/StoreFactory.cs` | Вибір реалізації за аргументами командного рядка |
-| `Program.cs` | `src/Cli/Program.cs` | Composition root і демонстраційний сценарій |
 
 ### Схема залежностей
 
@@ -72,30 +69,24 @@ Cli (Program.cs, StoreFactory) → CatalogService → ICatalogStore ← InMemory
 ### Формат зберігання
 
 - Файловий режим: `data/catalog.json` відносно папки виконання (`AppContext.BaseDirectory`),
-  наприклад `src/Cli/bin/Debug/net10.0/data/catalog.json`.
+  наприклад `src/Cli/bin/Debug/net8.0/data/catalog.json`.
 - Формат: JSON з відступами. На диск записуються `ProductDto`, а не сутності
   (мапінг `Product.FromDto` / `product.ToDto`).
 
-### Режими запуску
+### Режими сховища
 
-| Команда | Сховище | Поведінка |
+| Прапорець | Сховище | Поведінка |
 | :--- | :--- | :--- |
-| `dotnet run --project src/Cli` | `InMemoryCatalogStore` | Дані з `SampleData`, після виходу зникають |
-| `dotnet run --project src/Cli -- --file` | `FileCatalogStore` | Створюється `catalog.json`, повторний запуск бачить попередні записи |
-| `dotnet run --project src/Cli -- --cache` | `CachingCatalogStore` | Декоратор над in-memory сховищем |
-| `dotnet run --project src/Cli -- --file --cache` | `CachingCatalogStore` → `FileCatalogStore` | Декоратор над файловим сховищем |
+| (немає) | `InMemoryCatalogStore` | Дані з `SampleData`, після виходу зникають |
+| `--file` | `FileCatalogStore` | Створюється `catalog.json`, повторний запуск бачить попередні записи |
+| `--cache` | `CachingCatalogStore` | Декоратор над in-memory сховищем |
+| `--file --cache` | `CachingCatalogStore` → `FileCatalogStore` | Декоратор над файловим сховищем |
 
 Щоб очистити файлові дані, видаліть `catalog.json`:
 
 ```bash
-rm -f src/Cli/bin/Debug/net10.0/data/catalog.json
+rm -f src/Cli/bin/Debug/net8.0/data/catalog.json
 ```
-
-### Демонстрація
-
-Сценарій у `Program.cs`: додати товар, змінити (прихід), показати список, знайти за id.
-Також демонструються помилки, які перехоплюються в `try/catch` і виводяться людським текстом:
-дубль id, відсутній id, видача більша за залишок, некоректна кількість приходу.
 
 ## Доменні події (тиждень 6)
 
@@ -111,7 +102,6 @@ rm -f src/Cli/bin/Debug/net10.0/data/catalog.json
 | `CatalogService.Changed` | `src/Core/Services/CatalogService.cs` | `event EventHandler<CatalogChangedEventArgs>?`, піднімається в `OnChanged` після успішної зміни |
 | `INotificationSink` | `src/Core/Notifications/INotificationSink.cs` | Контракт приймача сповіщень (додаткове завдання 1) |
 | `ConsoleSink`, `FileSink` | `src/Cli/` | Реалізації приймачів, передаються сервісу через конструктор |
-| `Program.cs` | `src/Cli/Program.cs` | Підписки `+=` / `-=`, лог у `logs/app.log` |
 
 ### Правила
 
@@ -120,32 +110,82 @@ rm -f src/Cli/bin/Debug/net10.0/data/catalog.json
 - Після `-=` обробник мовчить, але дані змінюються.
 - `FindAll(Func<Product, bool>)` повертає значення, тому тут делегат `Func`, а не подія.
 - `ImportLines(lines, Action<string> onSkipped)`: Core повідомляє про пропущені рядки через колбек (додаткове завдання 2).
-- `Core` не містить `Console` і `logs` (перевірено через `grep`).
+- `logs/app.log` містить події до відписки, `logs/sink.log` — усі події (sink не відписується).
+- Демонстраційний сценарій подій лежить у тезі `lab06`: `git checkout lab06`.
 
-### Файли логів
+## LINQ-звіти (тиждень 7)
 
-- `logs/app.log` відносно `AppContext.BaseDirectory`, каталог створюється кодом; містить події до відписки.
-- `logs/sink.log`: пише `FileSink`, містить усі події, бо sink не відписується.
+Аналітика реалізована в `Core/Reports` як чисті статичні функції: вони приймають `IEnumerable<Product>`
+і повертають `IReadOnlyList<DTO>`. `Program.cs` не містить `Where`/`GroupBy`, лише виклики звітів і вивід.
 
-### Запуск
+### Запити
+
+| Метод | Питання | Оператори |
+| :--- | :--- | :--- |
+| `LowStock(source, threshold)` | Яких товарів бракує? | `Where`, `OrderBy`, `ThenBy`, `Select` |
+| `TopByQuantity(source, n)` | Які позиції мають найбільший залишок? | `TopBy` (власне розширення: `OrderByDescending`, `ThenBy`, `Take`) |
+| `ByUnit(source)` | Як розподілено залишок за одиницями? | `GroupBy`, `Count`, `Sum`, `OrderByDescending` |
+| `ByUnitQuery(source)` | Те саме в синтаксисі запитів | `from ... group ... into ... orderby ... select` |
+| `Totals(source)` | Скільки позицій, сума, середнє, максимум? | `Count`, `Sum`, `Average`, `Max` (порожнє джерело дає нулі) |
+| `MovementLines(products, movements)` | Які переміщення має кожен товар? | `Join` |
+| `MovementSummaries(products, movements)` | Зведення по всіх товарах, навіть без рухів | `GroupJoin` |
+| `TopMoved(products, movements, n)` | Які товари рухались найчастіше? | `GroupJoin`, `TopBy` |
+
+DTO: `StockLine`, `GroupSummary`, `MovementLine`, `MovementSummary` (record). Топ-N має другий ключ
+сортування (`Sku`), тому порядок однаковий за кожного запуску.
+
+### Підкоманди
 
 ```bash
-dotnet run --project src/Cli
+dotnet run --project src/Cli -- report-top
+dotnet run --project src/Cli -- report-low
+dotnet run --project src/Cli -- report-groups
+dotnet run --project src/Cli -- report-groups-q
+dotnet run --project src/Cli -- report-sum
+dotnet run --project src/Cli -- report-join
+dotnet run --project src/Cli -- report-moved
+dotnet run --project src/Cli -- demo-deferred
+dotnet run --project src/Cli -c Release -- bench
 ```
+
+Прапорці `--file`, `--cache` не сприймаються як назва команди; `--empty` підставляє порожнє джерело
+(звіти не падають, друкують `(порожньо)` або нулі).
+
+### Відкладене виконання
+
+Запит `source.Where(p => p.Quantity < 10)` лише описує відбір і нічого не обчислює. Виконання
+починається під час `Count()`, `ToList()` або `foreach`. У `demo-deferred` перший `query.Count()`
+дає 5, бо перебирає список у момент виклику. Після `source.Add(...)` другий `query.Count()` дає 6:
+запит виконався заново і побачив новий елемент. `ToList()` зафіксував результат, тому
+`snapshot.Count` лишається 6 навіть після `source.Clear()`, а сам запит після очищення дає 0.
+`query.Count()` — метод, що перебирає послідовність, `snapshot.Count` — властивість готового списку.
+
+### Синтаксис запитів і методів
+
+`ByUnit` (методний синтаксис) і `ByUnitQuery` (синтаксис запитів) дають однаковий результат.
+Для групування запис `group ... by ... into` читається природніше, а `Where`/`Take` зручніші зліва направо
+в методному синтаксисі. У синтаксисі запитів не можна передати `StringComparer`, тому ключ
+нормалізується через `ToLowerInvariant()`, що й робить його повільнішим на 100 000 записів.
+
+### Вимірювання часу (Stopwatch, 100 000 записів, Release, середнє з 5 запусків)
+
+| Звіт | Час, мс |
+| :--- | ---: |
+| `LowStock` без проміжних `ToList` | 30.5 |
+| `LowStock` з `ToList` після `Where` і `OrderBy` | 16.4 |
+| `TopByQuantity` (`TopBy`, n=5) | 2.2 |
+| `ByUnit` (методний синтаксис) | 15.1 |
+| `ByUnitQuery` (синтаксис запитів) | 23.6 |
+
+Проміжні `ToList` не обов'язково повільніші: вони додають виділення пам'яті, але можуть здешевити
+подальше сортування. Вимірювання з 5 запусків має похибку, тому висновок орієнтовний.
 
 ## Запуск та збірка
 
-### Збірка рішення:
-
 ```bash
 dotnet build
-```
-
-### Запуск CLI-застосунку:
-
-```bash
-dotnet run --project src/Cli
-dotnet run --project src/Cli -- --file
+dotnet run --project src/Cli -f net8.0 -- report-top
+dotnet run --project src/Cli -f net8.0 -- report-sum --file
 ```
 
 ## Публікація (Publishing)
